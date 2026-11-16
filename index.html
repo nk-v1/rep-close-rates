@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Rep Close Rates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: header + cycle timeline, tab bar, one view at a time (overall / cycle / rep), caveats at the foot */
+:root {
+  --bg: #f6f7f8; --surface: #ffffff; --ink: #18212b; --muted: #5d6a78; --line: #dfe3e8;
+  --accent: #0f6a6e; --accent-soft: #dcefef;
+  --low: #b8433a; --low-soft: #f6e1df; --mid: #a26b00; --mid-soft: #f6ecd6; --high: #2c7a3f; --high-soft: #ddefe1;
+  --bar: #0f6a6e; --bar-track: #e9edf0;
+  --f-head: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1418; --surface: #161d23; --ink: #e5eaee; --muted: #93a1ae; --line: #27313a;
+  --accent: #5cc3c3; --accent-soft: #173537;
+  --low: #ec8a80; --low-soft: #3a211f; --mid: #e3b45a; --mid-soft: #362b17; --high: #7cc98c; --high-soft: #1c3322;
+  --bar: #4fb3b3; --bar-track: #222b33; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1418; --surface: #161d23; --ink: #e5eaee; --muted: #93a1ae; --line: #27313a;
+  --accent: #5cc3c3; --accent-soft: #173537;
+  --low: #ec8a80; --low-soft: #3a211f; --mid: #e3b45a; --mid-soft: #362b17; --high: #7cc98c; --high-soft: #1c3322;
+  --bar: #4fb3b3; --bar-track: #222b33; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px; }
+.wrap > * { min-width: 0; }
+h1, h2, h3 { font-family: var(--f-head); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.num { font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+
+/* timeline */
+.tl { position: relative; height: 92px; margin-top: 10px; }
+.tl-axis { position: absolute; left: 0; right: 0; bottom: 18px; border-top: 1px solid var(--line); }
+.tl-tick { position: absolute; bottom: 0; font-size: 11px; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+.tl-bar { position: absolute; height: 22px; border-radius: 4px; background: var(--accent-soft); border: 1px solid var(--accent);
+  color: var(--ink); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  overflow: hidden; white-space: nowrap; font-family: var(--f-head); }
+.tl-bar:hover, .tl-bar:focus-visible { background: var(--accent); color: var(--surface); outline: none; }
+.tl-bar.open { border-style: dashed; }
+
+/* tabs */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { font: 600 13px var(--f-head); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+.tab:hover { border-color: var(--accent); }
+.tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.tab:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+.fact .v { font: 600 20px var(--f-head); margin-top: 2px; }
+.fact .s { color: var(--muted); font-size: 12px; }
+
+.head-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.rep { font-weight: 600; white-space: nowrap; }
+td.note { text-align: left; color: var(--muted); font-size: 12px; max-width: 280px; }
+tr.pool td { color: var(--muted); font-style: italic; background: color-mix(in srgb, var(--bg) 60%, transparent); }
+tr.pool td.rep { font-weight: 500; }
+tr.sep td { border-bottom: 2px solid var(--line); padding: 4px; }
+td.dash { color: var(--muted); }
+
+.ratecell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 190px; }
+.track { flex: 1; height: 8px; background: var(--bar-track); border-radius: 4px; overflow: hidden; max-width: 110px; }
+.fill { height: 100%; background: var(--bar); border-radius: 4px; }
+.chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; min-width: 58px; text-align: center; }
+.chip.low { color: var(--low); background: var(--low-soft); }
+.chip.mid { color: var(--mid); background: var(--mid-soft); }
+.chip.high { color: var(--high); background: var(--high-soft); }
+.chip.na { color: var(--muted); background: var(--bar-track); font-weight: 500; }
+.chip.part { color: var(--muted); background: var(--bar-track); }
+
+.rep-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pickers { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.pickers .label { min-width: 80px; text-align: right; }
+@media (max-width: 560px) { .pickers { align-items: flex-start; } .pickers .label { text-align: left; } }
+select { font: 500 14px var(--f-body); padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+
+.guide ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; max-width: 80ch; }
+.guide li { color: var(--ink); }
+tr.grp td { text-align: left; font: 600 11px var(--f-head); text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--accent); background: var(--accent-soft); padding: 6px 10px; }
+.foot { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width .3s ease; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Rep Close Rates</h1>
+    <p class="sub" id="sub"></p>
+  </header>
+
+  <section class="panel guide" aria-labelledby="gd-h">
+    <h2 id="gd-h">How to use this</h2>
+    <ul>
+      <li><b>Overall</b> shows each rep's close rate across all cycles. Active reps are on top, former reps below, each from highest close rate to lowest.</li>
+      <li>Pick a <b>cycle tab</b> (or click a bar in the timeline) to see that cycle's reps.</li>
+      <li><b>By rep</b> shows one rep cycle by cycle. Pick from Active rep, or from Former rep below it.</li>
+      <li><b>Leads</b> = leads the rep owned that cycle. <b>Touched</b> = leads with any CRM status (not blank). <b>Consumed</b> = leads with a status other than DNP, No Response or blank. <b>Still DNP</b> = leads whose status is DNP today.</li>
+      <li><b>Close rate</b> = closes ÷ leads. Closes come from the payment sheets.</li>
+      <li>A dash or "no rate" means that cycle has missing lead data (C4, C5 and part of C8). C9 is still open.</li>
+    </ul>
+  </section>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="head-row"><h2 id="tl-h">When each cycle closed</h2><span class="label">Bar = first to last payment · click to open</span></div>
+    <div class="tl" id="timeline"></div>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Views"></nav>
+
+  <main id="view"></main>
+
+  <p class="foot">Closes = Full or Partial payments in each cycle's payment sheet, one per phone. Leads, touched and consumed: C6 and C7 from the cycle-end reports, C5, C8 and C9 from Zoho (16 Nov 2026). Aggregates only.</p>
+</div>
+
+<script>
+const DATA = {"asOf": "16 Nov 2026", "cycles": [{"id": "C4", "leadsFrom": "", "leadsTo": "", "closesFrom": "2024-11-18", "closesTo": "2025-03-07", "closes": 294, "open": false}, {"id": "C5", "leadsFrom": "2025-04-05", "leadsTo": "2025-06-21", "closesFrom": "2025-03-18", "closesTo": "2025-07-10", "closes": 317, "open": false}, {"id": "C6", "leadsFrom": "2025-07-30", "leadsTo": "2025-11-01", "closesFrom": "2025-08-02", "closesTo": "2025-11-12", "closes": 293, "open": false}, {"id": "C7", "leadsFrom": "2025-11-10", "leadsTo": "2026-03-07", "closesFrom": "2025-12-10", "closesTo": "2026-04-01", "closes": 242, "open": false}, {"id": "C8", "leadsFrom": "2026-03-19", "leadsTo": "2026-07-13", "closesFrom": "2026-01-25", "closesTo": "2026-07-31", "closes": 185, "open": false}, {"id": "C9", "leadsFrom": "2026-08-02", "leadsTo": "2026-11-06", "closesFrom": "2026-08-22", "closesTo": "2026-11-11", "closes": 94, "open": true}], "rows": [{"cycle": "C4", "rep": "Anoop", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 108, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C4", "rep": "Mazin", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 91, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C4", "rep": "Dharshan", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 53, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C4", "rep": "Surjeet", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 31, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C4", "rep": "Nischal", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 10, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C4", "rep": "100x (no rep)", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 1, "rate": null, "partial": false, "partialRate": null, "note": "missing data: no C4 lead list", "pool": false}, {"cycle": "C5", "rep": "Akash", "leads": 173, "touched": 166, "consumed": 132, "dnp": 29, "closes": 0, "rate": null, "partial": true, "partialRate": 0.0, "note": "partial lead data (traced via today's Zoho)", "pool": false}, {"cycle": "C5", "rep": "Anoop", "leads": 100, "touched": 96, "consumed": 72, "dnp": 23, "closes": 79, "rate": null, "partial": false, "partialRate": null, "note": "missing data: only part of this rep's leads could be traced, so no close rate", "pool": false}, {"cycle": "C5", "rep": "Dharshan", "leads": 2314, "touched": 2146, "consumed": 1705, "dnp": 407, "closes": 70, "rate": null, "partial": true, "partialRate": 0.03025064822817632, "note": "partial lead data (traced via today's Zoho)", "pool": false}, {"cycle": "C5", "rep": "Mazin", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 58, "rate": null, "partial": false, "partialRate": null, "note": "missing data", "pool": false}, {"cycle": "C5", "rep": "Mustafa", "leads": 425, "touched": 333, "consumed": 216, "dnp": 114, "closes": 0, "rate": null, "partial": true, "partialRate": 0.0, "note": "partial lead data (traced via today's Zoho)", "pool": false}, {"cycle": "C5", "rep": "Sarthak", "leads": 2371, "touched": 2190, "consumed": 1595, "dnp": 422, "closes": 9, "rate": null, "partial": true, "partialRate": 0.003795866722901729, "note": "partial lead data (traced via today's Zoho)", "pool": false}, {"cycle": "C5", "rep": "Surjeet", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 74, "rate": null, "partial": false, "partialRate": null, "note": "missing data", "pool": false}, {"cycle": "C5", "rep": "Udhaya", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 11, "rate": null, "partial": false, "partialRate": null, "note": "missing data", "pool": false}, {"cycle": "C5", "rep": "Varsha", "leads": 378, "touched": 378, "consumed": 250, "dnp": 71, "closes": 0, "rate": null, "partial": true, "partialRate": 0.0, "note": "partial lead data (traced via today's Zoho)", "pool": false}, {"cycle": "C5", "rep": "Vivek", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 16, "rate": null, "partial": false, "partialRate": null, "note": "missing data", "pool": false}, {"cycle": "C6", "rep": "Varsha", "leads": 1419, "touched": 1419, "consumed": 804, "dnp": 411, "closes": 23, "rate": 0.01620859760394644, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C6", "rep": "Mustafa", "leads": 2258, "touched": 1944, "consumed": 1064, "dnp": 903, "closes": 10, "rate": 0.0044286979627989375, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C6", "rep": "Dharshan", "leads": 2641, "touched": 2453, "consumed": 1603, "dnp": 211, "closes": 101, "rate": 0.03824308973873533, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C6", "rep": "Surjeet", "leads": 3526, "touched": 3211, "consumed": null, "dnp": null, "closes": 118, "rate": 0.033465683494044246, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C6", "rep": "Sarthak", "leads": 2497, "touched": 2138, "consumed": 1008, "dnp": 437, "closes": 38, "rate": 0.015218261914297157, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C6", "rep": "Vivek", "leads": 251, "touched": 245, "consumed": null, "dnp": null, "closes": 1, "rate": 0.00398406374501992, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C6", "rep": "Udhaya", "leads": 625, "touched": 525, "consumed": null, "dnp": null, "closes": 1, "rate": 0.0016, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C7", "rep": "Akash", "leads": 1380, "touched": 1197, "consumed": 909, "dnp": 243, "closes": 6, "rate": 0.004347826086956522, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Anjana", "leads": 493, "touched": 462, "consumed": 332, "dnp": null, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C7", "rep": "Anoop", "leads": 490, "touched": 407, "consumed": 214, "dnp": 181, "closes": 15, "rate": 0.030612244897959183, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Anurag", "leads": 346, "touched": 274, "consumed": 203, "dnp": null, "closes": 5, "rate": 0.014450867052023121, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C7", "rep": "Dharshan", "leads": 1601, "touched": 1480, "consumed": 1165, "dnp": 192, "closes": 88, "rate": 0.05496564647095565, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Jaswinder", "leads": 1363, "touched": 1305, "consumed": 1006, "dnp": null, "closes": 5, "rate": 0.003668378576669112, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C7", "rep": "Saad", "leads": 1148, "touched": 1082, "consumed": 677, "dnp": null, "closes": 6, "rate": 0.005226480836236934, "partial": false, "partialRate": null, "note": "missing data: leads moved to Team 100x", "pool": false}, {"cycle": "C7", "rep": "Sarthak", "leads": 1595, "touched": 1340, "consumed": 870, "dnp": 297, "closes": 40, "rate": 0.025078369905956112, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Mustafa", "leads": 2091, "touched": 1843, "consumed": 727, "dnp": 990, "closes": 30, "rate": 0.014347202295552367, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Varsha", "leads": 1352, "touched": 1352, "consumed": 805, "dnp": 308, "closes": 37, "rate": 0.027366863905325445, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C7", "rep": "Surjeet", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 10, "rate": null, "partial": false, "partialRate": null, "note": "no CRM leads in C7", "pool": false}, {"cycle": "C8", "rep": "Mustafa", "leads": 2395, "touched": 2131, "consumed": 832, "dnp": 1268, "closes": 11, "rate": 0.004592901878914405, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Dharshan", "leads": 2272, "touched": 2272, "consumed": 1942, "dnp": 321, "closes": 57, "rate": 0.025088028169014086, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Sarthak", "leads": 1874, "touched": 1589, "consumed": 1257, "dnp": 274, "closes": 24, "rate": 0.012806830309498399, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Varsha", "leads": 1813, "touched": 1813, "consumed": 1130, "dnp": 516, "closes": 32, "rate": 0.01765030336458908, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Akash", "leads": 1735, "touched": 1347, "consumed": 1014, "dnp": 305, "closes": 10, "rate": 0.005763688760806916, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Anoop", "leads": 1282, "touched": 1279, "consumed": 503, "dnp": 751, "closes": 43, "rate": 0.033541341653666144, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Jaswinder", "leads": 368, "touched": 368, "consumed": 345, "dnp": 17, "closes": 6, "rate": null, "partial": false, "partialRate": null, "note": "incomplete lead data: only leads traced through status history; he had far more, exit date unknown", "pool": false}, {"cycle": "C8", "rep": "Kahfulvara", "leads": 255, "touched": 255, "consumed": 238, "dnp": 0, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Tanav", "leads": 236, "touched": 189, "consumed": 152, "dnp": 25, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Saptak", "leads": 203, "touched": 203, "consumed": 139, "dnp": 48, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "Lekshmi", "leads": 191, "touched": 191, "consumed": 156, "dnp": 30, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C8", "rep": "100x (no rep)", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 1, "rate": null, "partial": false, "partialRate": null, "note": "missing data: left rep, leads moved to Team 100x", "pool": false}, {"cycle": "C8", "rep": "Nehal", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 1, "rate": null, "partial": false, "partialRate": null, "note": "missing data: left rep, leads moved to Team 100x", "pool": false}, {"cycle": "C9", "rep": "Dharshan", "leads": 2354, "touched": 2277, "consumed": 1702, "dnp": 561, "closes": 17, "rate": 0.007221750212404418, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Sarthak", "leads": 2020, "touched": 1996, "consumed": 1323, "dnp": 511, "closes": 15, "rate": 0.007425742574257425, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Mustafa", "leads": 1998, "touched": 1883, "consumed": 946, "dnp": 891, "closes": 8, "rate": 0.004004004004004004, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Saptak", "leads": 1949, "touched": 1948, "consumed": 1164, "dnp": 557, "closes": 5, "rate": 0.002565418163160595, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Tanav", "leads": 1827, "touched": 1616, "consumed": 1064, "dnp": 452, "closes": 3, "rate": 0.0016420361247947454, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Akash", "leads": 1676, "touched": 1458, "consumed": 1004, "dnp": 380, "closes": 9, "rate": 0.0053699284009546535, "partial": false, "partialRate": null, "note": "user disabled in Zoho, still owns leads", "pool": false}, {"cycle": "C9", "rep": "Varsha", "leads": 1650, "touched": 1630, "consumed": 1026, "dnp": 532, "closes": 13, "rate": 0.00787878787878788, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Lekshmi", "leads": 1372, "touched": 1372, "consumed": 845, "dnp": 433, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "user off in Zoho; leads now in Team 100x, owner taken from history", "pool": false}, {"cycle": "C9", "rep": "Anoop", "leads": 1258, "touched": 1160, "consumed": 583, "dnp": 550, "closes": 20, "rate": 0.01589825119236884, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Mihir", "leads": 916, "touched": 916, "consumed": 532, "dnp": 364, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "user disabled in Zoho, still owns leads", "pool": false}, {"cycle": "C9", "rep": "Kahfulvara", "leads": 672, "touched": 672, "consumed": 586, "dnp": 22, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "user off in Zoho; leads now in Team 100x, owner taken from history", "pool": false}, {"cycle": "C9", "rep": "Ayush", "leads": 654, "touched": 531, "consumed": 345, "dnp": 162, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Jaswinder", "leads": 452, "touched": 452, "consumed": 384, "dnp": 59, "closes": 1, "rate": 0.0022123893805309734, "partial": false, "partialRate": null, "note": "user off in Zoho; leads now in Team 100x, owner taken from history", "pool": false}, {"cycle": "C9", "rep": "Shipra", "leads": 65, "touched": 37, "consumed": 29, "dnp": 7, "closes": 1, "rate": 0.015384615384615385, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "Rufed", "leads": 57, "touched": 57, "consumed": 18, "dnp": 39, "closes": 0, "rate": 0.0, "partial": false, "partialRate": null, "note": "", "pool": false}, {"cycle": "C9", "rep": "100x (no rep)", "leads": 0, "touched": 0, "consumed": 0, "dnp": 0, "closes": 2, "rate": null, "partial": false, "partialRate": null, "note": "closes credited to 100x (no rep)", "pool": false}, {"cycle": "C6", "rep": "100x (no rep)", "leads": null, "touched": null, "consumed": null, "dnp": null, "closes": 1, "rate": null, "partial": false, "partialRate": null, "note": "closes only", "pool": false}, {"cycle": "C5", "rep": "Unassigned (left reps)", "leads": 14720, "touched": 6232, "consumed": 4525, "dnp": 1587, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "C5 leads now on Team 100x with no earlier rep in status history (history only from 15 Jul 2026)", "pool": true}, {"cycle": "C6", "rep": "100x/unassigned", "leads": 8324, "touched": null, "consumed": 3713, "dnp": 1152, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "slide-10 '100x' row; Zoho = no non-100x owner found", "pool": true}, {"cycle": "C7", "rep": "Team 100x", "leads": 11700, "touched": 1341, "consumed": 1022, "dnp": 340, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "dnp and zoho_leads_today = C7 leads still with Team 100x and no earlier rep in status history", "pool": true}, {"cycle": "C8", "rep": "Unassigned (left reps)", "leads": 4854, "touched": 3087, "consumed": 2441, "dnp": 339, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "Team 100x today, no rep owner in history (from 15 Jul 2026)", "pool": true}, {"cycle": "C8", "rep": "Not in Zoho", "leads": 164, "touched": 0, "consumed": 0, "dnp": 0, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "phone in mastersheet, no Zoho lead", "pool": true}, {"cycle": "C9", "rep": "Unassigned (left reps)", "leads": 1322, "touched": 1322, "consumed": 975, "dnp": 252, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "Team 100x now; status set or rep-edited, no rep owner in history", "pool": true}, {"cycle": "C9", "rep": "Team 100x pool (never assigned)", "leads": 23452, "touched": 0, "consumed": 0, "dnp": 0, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "Team 100x now; never rep-owned, rep-edited or touched", "pool": true}, {"cycle": "C9", "rep": "Not in Zoho", "leads": 8, "touched": 0, "consumed": 0, "dnp": 0, "closes": 0, "rate": null, "partial": false, "partialRate": null, "note": "phone in mastersheet, no Zoho lead", "pool": true}], "caveats": ["<b>C4 leads: missing data.</b> There is no C4 lead list, so C4 shows closes only.", "<b>C5 leads: partial.</b> 72% of C5 leads have no traceable rep, because Mazin, Surjeet, Vivek and Udhaya are no longer in Zoho and its status history only starts on 15 Jul 2026. Their C5 rows show closes only, and C5 close rates are marked partial and left out of overall rates.", "<b>C8 leads of reps who left: missing data.</b> 4,854 C8 leads (3,087 touched) sit with Team 100x and have no earlier owner, so they are shown as one Unassigned (left reps) row.", "<b>Jaswinder, C8: incomplete.</b> Only 368 of his C8 leads could be traced (through status history); he had far more, and when he left is not known. No close rate is shown for that cycle.", "<b>C6 and C7 leads, touched and consumed</b> come from the cycle-end reports (C6 slide 10, C7 workbook), captured while those reps were active. Owners who only appear in Zoho today (for example Akash in C6) are left out of C6.", "<b>Still DNP</b> is today's status, not the status at cycle end. It is blank where the rep's leads have since gone back to Team 100x. It undercounts where only part of a rep's leads still sit with them (for example Dharshan in C7).", "<b>C5, C8 and C9 leads</b> are every lead in that cycle's mastersheet, including leads retargeted from earlier cycles, so one person can count in more than one cycle. C9 closes include 4 that came in between 13 and 16 Nov. [MEASURED]", "<b>C9 is still open.</b> Its close rates will rise as more payments come in; compare C9 with other cycles with care.", "<b>C8 closing dates</b> start on 25 Jan 2026 because a few early payments were logged on the C8 sheet; 2 payments dated in 2025 were skipped as typos.", "<b>Closes</b> are Full or Partial payments, one per phone per cycle. Refunds and deferrals are not removed unless the sheet itself removes them. [MEASURED]"]};
+const $ = (s, el = document) => el.querySelector(s);
+const fmt = n => n == null ? "–" : n.toLocaleString("en-IN");
+const pc = r => (r * 100).toFixed(2) + "%";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const dfmt = s => { if (!s) return "–"; const [y, m, d] = s.split("-").map(Number); return `${d} ${MON[m - 1]} ${y}`; };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+$("#sub").textContent = `C4 to C9 · closes match the payment sheets · as of ${DATA.asOf} · active reps first, highest close rate first`;
+const ACTIVE = ["Dharshan", "Anoop", "Sarthak", "Varsha", "Mustafa", "Saptak", "Tanav"];
+const isActive = rep => ACTIVE.includes(rep);
+// active reps first, then former reps, each already sorted
+function grouped(list, row, cols) {
+  const a = list.filter(r => isActive(r.rep)), f = list.filter(r => !isActive(r.rep));
+  const head = (t, n) => `<tr class="grp"><td colspan="${cols}">${t} · ${n}</td></tr>`;
+  return (a.length ? head("Active reps", a.length) + a.map(row).join("") : "") +
+         (f.length ? head("Former reps and others", f.length) + f.map(row).join("") : "");
+}
+
+// tier against the blended rate of the reps being compared
+function tierer(list) {
+  const rated = list.filter(r => r.rate != null);
+  const L = rated.reduce((a, r) => a + r.leads, 0), C = rated.reduce((a, r) => a + r.ratedCloses, 0);
+  const base = L ? C / L : 0;
+  return { base, tier: r => r == null ? "na" : r < base * 0.6 ? "low" : r > base * 1.4 ? "high" : "mid" };
+}
+function rateCell(rate, max, tier, partialRate) {
+  if (partialRate != null) return `<div class="ratecell"><span class="chip part">${pc(partialRate)} partial</span></div>`;
+  if (rate == null) return `<div class="ratecell"><span class="chip na">no rate</span></div>`;
+  const w = max ? Math.max(2, rate / max * 100) : 0;
+  return `<div class="ratecell"><div class="track"><div class="fill" style="width:${w}%"></div></div><span class="chip ${tier(rate)} num">${pc(rate)}</span></div>`;
+}
+const legend = base => `<div class="legend"><span><span class="chip low">low</span> under 0.6× the group rate</span><span><span class="chip mid">mid</span> in between</span><span><span class="chip high">high</span> over 1.4× · group rate ${pc(base)}</span></div>`;
+const sortRows = (a, b) => (a.rate == null) - (b.rate == null) || (b.rate ?? 0) - (a.rate ?? 0) || b.closes - a.closes;
+
+// timeline
+(function () {
+  const el = $("#timeline");
+  const t = s => new Date(s + "T00:00:00").getTime();
+  const lo = t("2024-11-01"), hi = t("2026-12-31"), span = hi - lo;
+  const x = s => ((t(s) - lo) / span * 100);
+  let html = '<div class="tl-axis"></div>';
+  ["2025-01-01", "2025-07-01", "2026-01-01", "2026-07-01"].forEach(s => {
+    html += `<span class="tl-tick" style="left:${x(s)}%">${MON[+s.slice(5, 7) - 1]} ${s.slice(0, 4)}</span>`;
+  });
+  DATA.cycles.forEach((c, i) => {
+    const end = c.open ? "2026-11-16" : c.closesTo;
+    const left = x(c.closesFrom), w = Math.max(3, x(end) - left);
+    const top = i % 2 ? 36 : 6;
+    html += `<button class="tl-bar${c.open ? " open" : ""}" style="left:${left}%;width:${w}%;top:${top}px" data-go="${c.id.toLowerCase()}"
+      title="${c.id}: closes ${dfmt(c.closesFrom)} – ${c.open ? "open" : dfmt(c.closesTo)}, ${c.closes} closes">${c.id} · ${c.closes}</button>`;
+  });
+  el.innerHTML = html;
+  el.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
+})();
+
+// tabs + routing
+const VIEWS = [["overall", "Overall"], ...DATA.cycles.map(c => [c.id.toLowerCase(), c.id]), ["reps", "By rep"]];
+$("#tabs").innerHTML = VIEWS.map(([id, l]) => `<button class="tab" role="tab" id="tab-${id}" data-go="${id}">${l}</button>`).join("");
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
+function go(id) { if (location.hash !== "#" + id) location.hash = id; else render(); }
+window.addEventListener("hashchange", render);
+
+const repRows = DATA.rows.filter(r => !r.pool);
+const reps = [...new Set(repRows.map(r => r.rep))].sort();
+
+function overallList() {
+  return reps.map(rep => {
+    const rs = repRows.filter(r => r.rep === rep);
+    const rated = rs.filter(r => r.rate != null);
+    const leads = rated.reduce((a, r) => a + r.leads, 0);
+    const ratedCloses = rated.reduce((a, r) => a + r.closes, 0);
+    return {
+      rep, cycles: rs.map(r => r.cycle).sort(), ratedCycles: rated.map(r => r.cycle).sort(),
+      allCloses: rs.reduce((a, r) => a + r.closes, 0), leads, ratedCloses,
+      touched: rated.reduce((a, r) => a + (r.touched || 0), 0), consumed: rated.reduce((a, r) => a + (r.consumed || 0), 0),
+      rate: leads ? ratedCloses / leads : null, closes: rs.reduce((a, r) => a + r.closes, 0),
+    };
+  }).sort(sortRows);
+}
+
+function viewOverall() {
+  const list = overallList();
+  const { base, tier } = tierer(list);
+  const max = Math.max(...list.map(r => r.rate || 0));
+  const rated = list.filter(r => r.rate != null);
+  const body = grouped(list, r => `<tr>
+    <td class="rep">${esc(r.rep)}</td><td class="num">${r.allCloses}</td>
+    <td>${r.ratedCycles.join(", ") || "–"}</td><td class="num">${fmt(r.leads || null)}</td>
+    <td class="num">${r.ratedCycles.length ? r.ratedCloses : "–"}</td>
+    <td>${rateCell(r.rate, max, tier)}</td>
+    <td class="note">${r.ratedCycles.length ? (r.ratedCloses !== r.allCloses ? `rate uses ${r.ratedCycles.join(", ")} only` : "") : "missing lead data"}</td></tr>`, 7);
+  return `<section class="panel">
+    <div class="head-row"><h2>Overall, to date</h2>${legend(base)}</div>
+    <div class="facts" style="margin-top:12px">
+      <div class="fact"><div class="label">Closes, C4–C9</div><div class="v num">${fmt(DATA.cycles.reduce((a, c) => a + c.closes, 0))}</div><div class="s">all payment sheets</div></div>
+      <div class="fact"><div class="label">Reps with a close rate</div><div class="v num">${rated.length}</div><div class="s">of ${list.length} people with closes or leads</div></div>
+      <div class="fact"><div class="label">Group close rate</div><div class="v num">${pc(base)}</div><div class="s">rated cycles only</div></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Rep</th><th>All closes</th><th>Cycles with lead data</th><th>Leads</th><th>Closes in those cycles</th><th>Close rate</th><th>Note</th></tr></thead>
+      <tbody>${body}</tbody></table></div></section>`;
+}
+
+function viewCycle(id) {
+  const c = DATA.cycles.find(x => x.id.toLowerCase() === id);
+  const rs = repRows.filter(r => r.cycle === c.id).map(r => ({ ...r, ratedCloses: r.closes })).sort(sortRows);
+  const pools = DATA.rows.filter(r => r.pool && r.cycle === c.id);
+  const { base, tier } = tierer(rs);
+  const max = Math.max(...rs.map(r => r.rate || 0), ...rs.map(r => r.partialRate || 0));
+  const allLeads = rs.concat(pools).reduce((a, r) => a + (r.leads || 0), 0);
+  const tr = (r, pool) => `<tr class="${pool ? "pool" : ""}">
+    <td class="rep">${esc(r.rep)}</td><td class="num">${fmt(r.leads)}</td><td class="num">${fmt(r.touched)}</td>
+    <td class="num">${fmt(r.consumed)}</td><td class="num">${fmt(r.dnp)}</td><td class="num">${pool ? "" : r.closes}</td>
+    <td>${pool ? "" : rateCell(r.rate, max, tier, r.partial ? r.partialRate : null)}</td><td class="note">${esc(r.note)}</td></tr>`;
+  return `<section class="panel">
+    <div class="head-row"><h2>${c.id}</h2>${rs.some(r => r.rate != null) ? legend(base) : ""}</div>
+    <div class="facts" style="margin-top:12px">
+      <div class="fact"><div class="label">Closes came in</div><div class="v">${dfmt(c.closesFrom)} – ${c.open ? "open" : dfmt(c.closesTo)}</div><div class="s">first to last payment${c.open ? ", live to 16 Nov" : ""}</div></div>
+      <div class="fact"><div class="label">New leads came in</div><div class="v">${c.leadsFrom ? `${dfmt(c.leadsFrom)} – ${dfmt(c.leadsTo)}` : "not available"}</div><div class="s">mastersheet sign-ups</div></div>
+      <div class="fact"><div class="label">Closes</div><div class="v num">${c.closes}</div><div class="s">payment sheet</div></div>
+      <div class="fact"><div class="label">Leads in this view</div><div class="v num">${allLeads ? fmt(allLeads) : "–"}</div><div class="s">${allLeads ? "reps plus unassigned rows" : "missing lead data"}</div></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Rep</th><th>Leads</th><th>Touched</th><th>Consumed</th><th>Still DNP</th><th>Closes</th><th>Close rate</th><th>Note</th></tr></thead>
+      <tbody>${grouped(rs, r => tr(r, false), 8)}${pools.length ? `<tr class="sep"><td colspan="8"></td></tr>` + pools.map(r => tr(r, true)).join("") : ""}</tbody>
+    </table></div></section>`;
+}
+
+let pickedRep = null;
+try { pickedRep = localStorage.getItem("rep-pick"); } catch (e) {}
+function viewReps() {
+  const list = overallList();
+  const activeReps = ACTIVE.filter(r => reps.includes(r));
+  const formerReps = list.filter(r => !isActive(r.rep)).map(r => r.rep);
+  if (!reps.includes(pickedRep)) pickedRep = activeReps[0];
+  const opt = r => `<option${r === pickedRep ? " selected" : ""}>${esc(r)}</option>`;
+  const o = list.find(r => r.rep === pickedRep);
+  const rs = repRows.filter(r => r.rep === pickedRep).sort((a, b) => a.cycle.localeCompare(b.cycle));
+  const max = Math.max(...repRows.map(r => r.rate || 0));
+  const { tier } = tierer(list);
+  const body = rs.map(r => `<tr><td class="rep">${r.cycle}</td><td class="num">${fmt(r.leads)}</td><td class="num">${fmt(r.touched)}</td>
+    <td class="num">${fmt(r.consumed)}</td><td class="num">${fmt(r.dnp)}</td><td class="num">${r.closes}</td>
+    <td>${rateCell(r.rate, max, tier, r.partial ? r.partialRate : null)}</td><td class="note">${esc(r.note)}</td></tr>`).join("");
+  const total = `<tr><td class="rep">Overall</td><td class="num">${fmt(o.leads || null)}</td><td class="num">${o.ratedCycles.length ? fmt(o.touched) : "–"}</td>
+    <td class="num">${o.ratedCycles.length ? fmt(o.consumed) : "–"}</td><td class="dash">–</td><td class="num"><b>${o.allCloses}</b></td>
+    <td>${rateCell(o.rate, max, tier)}</td><td class="note">${o.ratedCycles.length ? `rate uses ${o.ratedCycles.join(", ")}` : "missing lead data"}</td></tr>`;
+  return `<section class="panel">
+    <div class="head-row"><h2>By rep</h2>
+      <div class="pickers">
+        <label class="rep-pick" for="rep-active"><span class="label">Active rep</span>
+          <select id="rep-active" data-pick><option value="">Choose…</option>${activeReps.map(opt).join("")}</select></label>
+        <label class="rep-pick" for="rep-former"><span class="label">Former rep</span>
+          <select id="rep-former" data-pick><option value="">Choose…</option>${formerReps.map(opt).join("")}</select></label>
+      </div></div>
+    <p class="sub">Showing <b>${esc(pickedRep)}</b> <span class="chip ${isActive(pickedRep) ? "high" : "na"}">${isActive(pickedRep) ? "active" : "former"}</span></p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Cycle</th><th>Leads</th><th>Touched</th><th>Consumed</th><th>Still DNP</th><th>Closes</th><th>Close rate</th><th>Note</th></tr></thead>
+      <tbody>${body}<tr class="sep"><td colspan="8"></td></tr>${total}</tbody></table></div></section>`;
+}
+
+function render() {
+  const id = (location.hash || "#overall").slice(1);
+  const known = VIEWS.some(([v]) => v === id) ? id : "overall";
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.go === known));
+  $("#view").innerHTML = known === "overall" ? viewOverall() : known === "reps" ? viewReps() : viewCycle(known);
+  document.querySelectorAll("[data-pick]").forEach(sel => sel.addEventListener("change", () => {
+    if (!sel.value) return;
+    pickedRep = sel.value; try { localStorage.setItem("rep-pick", pickedRep); } catch (e) {} render();
+  }));
+}
+render();
+</script>
+
+</html>
