@@ -121,8 +121,9 @@ tr.grp td { text-align: left; font: 600 11px var(--f-head); text-transform: uppe
   <section class="panel guide" aria-labelledby="gd-h">
     <h2 id="gd-h">How to use this</h2>
     <ul>
-      <li><b>Overall</b> opens with the whole team's closes by month and refunds per cycle, then each rep's close rate across all cycles. Active reps are on top, former reps below, each from highest close rate to lowest.</li>
+      <li><b>Overall</b> shows each rep's close rate across all cycles. Active reps are on top, former reps below, each from highest close rate to lowest.</li>
       <li>Pick a <b>cycle tab</b> (or click a bar in the timeline) to see that cycle's reps.</li>
+      <li><b>Closes by month</b> shows the whole team's closes added each month per cycle, and refunds per cycle.</li>
       <li><b>By rep</b> shows one rep cycle by cycle. Pick from Active rep, or from Former rep below it.</li>
       <li><b>Leads</b> = leads the rep owned that cycle. <b>Touched</b> = leads with any CRM status (not blank). <b>Consumed</b> = leads with a status other than DNP, No Response or blank. <b>Still DNP</b> = leads whose status is DNP today.</li>
       <li><b>Close rate</b> = closes ÷ leads. Closes come from the payment sheets.</li>
@@ -200,7 +201,7 @@ const sortRows = (a, b) => (a.rate == null) - (b.rate == null) || (b.rate ?? 0) 
 })();
 
 // tabs + routing
-const VIEWS = [["overall", "Overall"], ...DATA.cycles.map(c => [c.id.toLowerCase(), c.id]), ["reps", "By rep"]];
+const VIEWS = [["overall", "Overall"], ["monthly", "Closes by month"], ...DATA.cycles.map(c => [c.id.toLowerCase(), c.id]), ["reps", "By rep"]];
 $("#tabs").innerHTML = VIEWS.map(([id, l]) => `<button class="tab" role="tab" id="tab-${id}" data-go="${id}">${l}</button>`).join("");
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
 function go(id) { if (location.hash !== "#" + id) location.hash = id; else render(); }
@@ -277,8 +278,8 @@ function viewOverall() {
     <td class="num">${r.ratedCycles.length ? r.ratedCloses : "–"}</td>
     <td>${rateCell(r.rate, max, tier)}</td>
     <td class="note">${r.ratedCycles.length ? (r.ratedCloses !== r.allCloses ? `rate uses ${r.ratedCycles.join(", ")} only` : "") : "missing lead data"}</td></tr>`, 7);
-  return orgMonthly() + `<section class="panel">
-    <div class="head-row"><h2>Overall by rep, to date</h2>${legend(base)}</div>
+  return `<section class="panel">
+    <div class="head-row"><h2>Overall, to date</h2>${legend(base)}</div>
     <div class="facts" style="margin-top:12px">
       <div class="fact"><div class="label">Closes, C4–C9</div><div class="v num">${fmt(DATA.cycles.reduce((a, c) => a + c.closes, 0))}</div><div class="s">all payment sheets</div></div>
       <div class="fact"><div class="label">Reps with a close rate</div><div class="v num">${rated.length}</div><div class="s">of ${list.length} people with closes or leads</div></div>
@@ -350,7 +351,7 @@ function render() {
   const id = (location.hash || "#overall").slice(1);
   const known = VIEWS.some(([v]) => v === id) ? id : "overall";
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.go === known));
-  $("#view").innerHTML = known === "overall" ? viewOverall() : known === "reps" ? viewReps() : viewCycle(known);
+  $("#view").innerHTML = known === "overall" ? viewOverall() : known === "monthly" ? orgMonthly() : known === "reps" ? viewReps() : viewCycle(known);
   document.querySelectorAll("[data-pick]").forEach(sel => sel.addEventListener("change", () => {
     if (!sel.value) return;
     pickedRep = sel.value; try { localStorage.setItem("rep-pick", pickedRep); } catch (e) {} render();
