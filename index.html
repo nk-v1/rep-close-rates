@@ -228,6 +228,8 @@ function overallList() {
 
 // org level: plain tables, no charts
 function orgLevel() {
+  const kind = p => p.paid === "Full" ? "full" : (p.later ? "balance" : "down");
+  const split = (c, k) => DATA.refundPeople.filter(p => (!c || p.cycle === c) && kind(p) === k).length;
   const lab = s => { const [y, mo] = s.split("-").map(Number); return `${MON[mo - 1]} ${y}`; };
   const n = v => v == null ? "–" : fmt(Math.round(v));
   const p = v => v == null ? "–" : v === 0 ? "0%" : pc(v);
@@ -252,7 +254,7 @@ function orgLevel() {
     const note = open && !r.refunds ? "Cycle still open" : !r.refunds ? "" :
       missing === r.refunds ? "No refund date on the sheet" :
       missing ? `${missing} of ${r.refunds} ${missing === 1 ? "has" : "have"} no refund date on the sheet` : "";
-    return `<tr><td class="rep">${r.cycle}</td><td>${r.refunds}</td><td>${r.paid_full}</td><td>${r.paid_partial}</td>
+    return `<tr><td class="rep">${r.cycle}</td><td>${r.refunds}</td><td>${split(r.cycle, "down")}</td><td>${split(r.cycle, "balance")}</td><td>${split(r.cycle, "full")}</td>
       <td>${r.refund_dates || "–"}</td>
       <td>${r.days_after_payment ? r.days_after_payment.split("; ").map(d => d + " days").join(", ") : "–"}</td>
       <td class="note">${note}</td></tr>`;
@@ -266,7 +268,19 @@ function orgLevel() {
   const pplRows = DATA.refundPeople.map(r => `<tr><td class="rep">${r.cycle}</td><td>${r.n}</td><td>${dfmt(r.first_paid)}</td>
     <td>${+r.before === 0 ? "Last month" : (+r.before >= 3 ? "3+ months" : BWORD[+r.before])}</td>
     <td>${r.paid}${r.later ? `, ${esc(r.later)}` : ""}</td><td>${r.refunded_on ? dfmt(r.refunded_on) : "No date on sheet"}</td></tr>`).join("");
-  return `<section class="panel">
+  const R = DATA.refundPeople.length, sh = n => Math.round(n / R * 100);
+  const T = DATA.refundTiming, early = T.find(x => x.before === 3), last = T.find(x => x.before === 0);
+  const byC = ["C4", "C5", "C6", "C7", "C8"].map(c => `${c} ${DATA.refundPeople.filter(p => p.cycle === c).length}`).join(", ");
+  return `<section class="panel guide">
+    <h2>Key points on refunds</h2>
+    <ul>
+      <li>${R} refunds from C4 to C8 (${byC}). C9 has none so far.</li>
+      <li>Half the refunds (${split(null, "down")} of ${R}, ${sh(split(null, "down"))}%) paid only the down payment and asked for a refund before paying the balance. The other half had paid the full fee: ${split(null, "full")} paid in full upfront (${sh(split(null, "full"))}%) and ${split(null, "balance")} paid the balance first and were refunded after that (${sh(split(null, "balance"))}%).</li>
+      <li>People who pay early refund more. The refund rate is ${(early.rate * 100).toFixed(1)}% for those who paid 3 or more months before the cohort started, and ${(last.rate * 100).toFixed(1)}% for those who paid in the last month.</li>
+      <li>Refunds come at the end of the cycle, just before the cohort starts, when we push partial payers for the balance.</li>
+    </ul>
+  </section>
+  <section class="panel">
     <h2>Cycle summary</h2>
     <div class="tbl-wrap"><table class="center">
       <thead><tr><th>Cycle</th><th>Lead source</th><th>Leads</th><th>Closes (after refunds)</th><th>Conversion</th><th>Refunds</th><th>Gross closes</th><th>Refund rate</th></tr></thead>
@@ -283,9 +297,9 @@ function orgLevel() {
   <section class="panel">
     <h2>Refunds</h2>
     <div class="tbl-wrap"><table class="center">
-      <thead><tr><th>Cycle</th><th>Refunds</th><th>Paid full first</th><th>Paid partial first</th><th>Refund dates on the sheet</th><th>Time after payment</th><th>Note</th></tr></thead>
-      <tbody>${refRows}<tr><td class="rep">Total</td><td><b>${tot("refunds")}</b></td><td><b>${tot("paid_full")}</b></td><td><b>${tot("paid_partial")}</b></td><td></td><td></td><td></td></tr></tbody></table></div>
-    <p class="sub">Refunds come at the end of the cycle, just before the cohort starts, when we push partial payers to pay the balance. Where a date is on the sheet, the refund came 9 to 76 days after the person paid, and none came in the first month. ${tot("paid_partial")} of ${tot("refunds")} refunds were people who first paid partially.</p>
+      <thead><tr><th>Cycle</th><th>Refunds</th><th>Down payment only</th><th>Down payment, then full balance</th><th>Paid in full upfront</th><th>Refund dates on the sheet</th><th>Time after payment</th><th>Note</th></tr></thead>
+      <tbody>${refRows}<tr><td class="rep">Total</td><td><b>${tot("refunds")}</b></td><td><b>${split(null, "down")}</b></td><td><b>${split(null, "balance")}</b></td><td><b>${split(null, "full")}</b></td><td></td><td></td><td></td></tr></tbody></table></div>
+    <p class="sub">Refunds come at the end of the cycle, just before the cohort starts, when we push partial payers to pay the balance. Where a date is on the sheet, the refund came 9 to 76 days after the person paid, and none came in the first month.</p>
   </section>
   <section class="panel">
     <h2>Refunds by when they first paid</h2>
