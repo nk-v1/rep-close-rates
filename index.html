@@ -88,6 +88,7 @@ td.dash { color: var(--muted); }
 .mval { font: 600 16px var(--f-head); }
 .mrun { font-size: 11px; color: var(--muted); }
 table.narrow { min-width: 640px; }
+table.center th, table.center td { text-align: center; }
 .ratecell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 190px; }
 .track { flex: 1; height: 8px; background: var(--bar-track); border-radius: 4px; overflow: hidden; max-width: 110px; }
 .fill { height: 100%; background: var(--bar); border-radius: 4px; }
@@ -229,9 +230,9 @@ function overallList() {
 function orgLevel() {
   const lab = s => { const [y, mo] = s.split("-").map(Number); return `${MON[mo - 1]} ${y}`; };
   const n = v => v == null ? "–" : fmt(Math.round(v));
-  const p = v => v == null ? "–" : pc(v);
-  const sumRows = DATA.summary.map(r => `<tr><td class="rep">${esc(r.cycle)}${r.open ? " (still open)" : ""}</td>
-    <td style="text-align:left">${esc(r.source)}</td><td class="num">${r.leads == null ? (r.cycle === "C4" ? "Incomplete data" : "–") : n(r.leads)}</td>
+  const p = v => v == null ? "–" : v === 0 ? "0%" : pc(v);
+  const sumRows = DATA.summary.filter(r => !r.cycle.includes("EZ")).map(r => `<tr><td class="rep">${esc(r.cycle)}${r.open ? " (still open)" : ""}</td>
+    <td>${esc(r.source)}</td><td class="num">${r.leads == null ? (r.cycle === "C4" ? "Incomplete data" : "–") : n(r.leads)}</td>
     <td class="num">${n(r.closes)}</td><td class="num">${r.leads == null ? (r.cycle === "C4" ? "Incomplete data" : "–") : p(r.conversion)}</td>
     <td class="num">${n(r.refunds)}</td><td class="num">${n(r.gross)}</td><td class="num">${p(r.refundRate)}</td></tr>`).join("");
   const maxNo = Math.max(...DATA.months.map(m => m.month_no));
@@ -251,8 +252,8 @@ function orgLevel() {
     <td class="note">${r.dated < r.refunds && r.refunds ? `missing data: ${r.refunds - r.dated} of ${r.refunds} ${r.refunds - r.dated === 1 ? "has" : "have"} no refund date` : (r.note || "")}</td></tr>`).join("");
   return `<section class="panel">
     <h2>Cycle summary</h2>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Cycle</th><th style="text-align:left">Lead source</th><th>Leads</th><th>Closes (after refunds)</th><th>Conversion</th><th>Refunds</th><th>Gross closes</th><th>Refund rate</th></tr></thead>
+    <div class="tbl-wrap"><table class="center">
+      <thead><tr><th>Cycle</th><th>Lead source</th><th>Leads</th><th>Closes (after refunds)</th><th>Conversion</th><th>Refunds</th><th>Gross closes</th><th>Refund rate</th></tr></thead>
       <tbody>${sumRows}</tbody></table></div>
     <p class="sub">Leads = unique people in that cycle's mastersheet. Conversion = closes ÷ leads. Refund rate = refunds ÷ gross closes. C4 to C8 were organic only; paid ads started in C9.</p>
   </section>
