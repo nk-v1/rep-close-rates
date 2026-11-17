@@ -124,7 +124,7 @@ tr.grp td { text-align: left; font: 600 11px var(--f-head); text-transform: uppe
     <ul>
       <li><b>Overall</b> shows each rep's close rate across all cycles. Active reps are on top, former reps below, each from highest close rate to lowest.</li>
       <li>Pick a <b>cycle tab</b> (or click a bar in the timeline) to see that cycle's reps.</li>
-      <li><b>Org level</b> shows the whole team per cycle: leads, closes, conversion and refunds, then closes by month and refund timing.</li>
+      <li><b>Org level</b> shows the whole team: leads, closes and refunds per cycle, closes per month, and when refunded people paid.</li>
       <li><b>By rep</b> shows one rep cycle by cycle. Pick from Active rep, or from Former rep below it.</li>
       <li><b>Leads</b> = leads the rep owned that cycle. <b>Touched</b> = leads with any CRM status (not blank). <b>Consumed</b> = leads with a status other than DNP, No Response or blank. <b>Still DNP</b> = leads whose status is DNP today.</li>
       <li><b>Close rate</b> = closes ÷ leads. Closes come from the payment sheets.</li>
@@ -226,17 +226,54 @@ function overallList() {
   }).sort(sortRows);
 }
 
-// org level: plain tables, no charts
+// org level: plain tables, simple words, one cycle toggle for the refund tables
+let orgCycle = "all";
 function orgLevel() {
   const kind = p => p.paid === "Full" ? "full" : (p.later ? "balance" : "down");
-  const split = (c, k) => DATA.refundPeople.filter(p => (!c || p.cycle === c) && kind(p) === k).length;
+  const PEOPLE = DATA.refundPeople;
+  const pick = orgCycle === "all" ? PEOPLE : PEOPLE.filter(p => p.cycle === orgCycle);
+  const split = (list, k) => list.filter(p => kind(p) === k).length;
   const lab = s => { const [y, mo] = s.split("-").map(Number); return `${MON[mo - 1]} ${y}`; };
   const n = v => v == null ? "–" : fmt(Math.round(v));
-  const p = v => v == null ? "–" : v === 0 ? "0%" : pc(v);
+  const p1 = v => v == null ? "–" : v === 0 ? "0%" : (v * 100).toFixed(2) + "%";
+  const r1 = v => (v * 100).toFixed(1) + "%";
+  const WHEN = ["1 month before start", "2 months before start", "3 months before start", "4+ months before start"];
+
+  // closes per "months before start" bucket, per cycle (cycle end = last month with 3+ closes)
+  const ends = {};
+  DATA.cycles.forEach(c => {
+    const ms = DATA.months.filter(m => m.cycle === c.id && m.month_no > 0 && m.closes >= 3).map(m => m.month).sort();
+    ends[c.id] = ms[ms.length - 1];
+  });
+  const gap = (c, ym) => { const [ey, em] = ends[c].split("-").map(Number), [y, m] = ym.split("-").map(Number); return Math.max(0, (ey - y) * 12 + (em - m)); };
+  const refCycles = [...new Set(PEOPLE.map(p => p.cycle))];
+  const inView = c => orgCycle === "all" ? refCycles.includes(c) : c === orgCycle;
+  const buckets = [0, 1, 2, 3].map(b => {
+    const closes = DATA.months.filter(m => m.month_no > 0 && inView(m.cycle) && Math.min(3, gap(m.cycle, m.month)) === b).reduce((a, m) => a + m.closes, 0);
+    const refunds = pick.filter(p => Math.min(3, +p.before) === b).length;
+    return { b, closes, refunds };
+  });
+  const tc = buckets.reduce((a, x) => a + x.closes, 0), tr = buckets.reduce((a, x) => a + x.refunds, 0);
+
+  // key points (always all cycles)
+  const R = PEOPLE.length, sh = k => Math.round(k / R * 100);
+  const all = DATA.refundTiming, early = all.find(x => x.before === 3), last = all.find(x => x.before === 0);
+  const byC = refCycles.map(c => `${c} ${PEOPLE.filter(p => p.cycle === c).length}`).join(", ");
+  const keyBox = `<section class="panel guide">
+    <h2>Refunds in short</h2>
+    <ul>
+      <li>${R} refunds from C4 to C8 (${byC}). None in C9 yet.</li>
+      <li>Half (${split(PEOPLE, "down")} of ${R}) paid only the down payment, then asked for a refund. ${split(PEOPLE, "full")} paid in full upfront (${sh(split(PEOPLE, "full"))}%). ${split(PEOPLE, "balance")} paid the down payment and the full balance, then asked (${sh(split(PEOPLE, "balance"))}%).</li>
+      <li>People who pay early refund more: ${r1(early.rate)} of those who paid 4+ months before start, against ${r1(last.rate)} of those who paid in the last month.</li>
+      <li>Refunds happen just before the cohort starts, when we chase partial payers for the balance.</li>
+    </ul>
+  </section>`;
+
   const sumRows = DATA.summary.filter(r => !r.cycle.includes("EZ")).map(r => `<tr><td class="rep">${esc(r.cycle)}${r.open ? " (still open)" : ""}</td>
-    <td>${esc(r.source)}</td><td class="num">${r.leads == null ? (r.cycle === "C4" ? "Incomplete data" : "–") : n(r.leads)}</td>
-    <td class="num">${n(r.closes)}</td><td class="num">${r.leads == null ? (r.cycle === "C4" ? "Incomplete data" : "–") : p(r.conversion)}</td>
-    <td class="num">${n(r.refunds)}</td><td class="num">${n(r.gross)}</td><td class="num">${p(r.refundRate)}</td></tr>`).join("");
+    <td>${esc(r.source)}</td><td>${r.leads == null ? "Incomplete data" : n(r.leads)}</td>
+    <td>${n(r.closes)}</td><td>${r.leads == null ? "Incomplete data" : p1(r.conversion)}</td>
+    <td>${n(r.refunds)}</td><td>${n(r.gross)}</td><td>${p1(r.refundRate)}</td></tr>`).join("");
+
   const maxNo = Math.max(...DATA.months.map(m => m.month_no));
   const monRows = DATA.cycles.map(c => {
     const ms = DATA.months.filter(m => m.cycle === c.id);
@@ -246,74 +283,56 @@ function orgLevel() {
       return m ? `<td class="num">${m.closes} <span class="mlab">(${lab(m.month)})</span></td>` : `<td class="dash">–</td>`;
     }).join("");
     const total = ms.reduce((a, m) => a + m.closes, 0);
-    return `<tr><td class="rep">${c.id}</td>${cells}<td class="num"><b>${total}</b>${typo ? ` <span class="mlab">(incl. ${typo.closes} with a date typo)</span>` : ""}</td></tr>`;
+    return `<tr><td class="rep">${c.id}</td>${cells}<td class="num"><b>${total}</b>${typo ? ` <span class="mlab">(incl. ${typo.closes} with a wrong date)</span>` : ""}</td></tr>`;
   }).join("");
+
   const refRows = DATA.refunds.map(r => {
+    const ppl = PEOPLE.filter(p => p.cycle === r.cycle);
     const open = DATA.cycles.find(c => c.id === r.cycle)?.open;
     const missing = r.refunds - r.dated;
-    const note = open && !r.refunds ? "Cycle still open" : !r.refunds ? "" :
-      missing === r.refunds ? "No refund date on the sheet" :
-      missing ? `${missing} of ${r.refunds} ${missing === 1 ? "has" : "have"} no refund date on the sheet` : "";
-    return `<tr><td class="rep">${r.cycle}</td><td>${r.refunds}</td><td>${split(r.cycle, "down")}</td><td>${split(r.cycle, "balance")}</td><td>${split(r.cycle, "full")}</td>
-      <td>${r.refund_dates || "–"}</td>
-      <td>${r.days_after_payment ? r.days_after_payment.split("; ").map(d => d + " days").join(", ") : "–"}</td>
-      <td class="note">${note}</td></tr>`;
+    const note = open && !r.refunds ? "Still open" : !r.refunds ? "" : missing === r.refunds ? "No refund dates" : missing ? `${missing} of ${r.refunds} without a date` : "";
+    return `<tr><td class="rep">${r.cycle}</td><td>${r.refunds}</td><td>${split(ppl, "down")}</td><td>${split(ppl, "balance")}</td><td>${split(ppl, "full")}</td><td class="note">${note}</td></tr>`;
   }).join("");
-  const tot = k => DATA.refunds.reduce((a, r) => a + r[k], 0);
-  const BLAB = ["Last month", "2nd-last month", "3rd-last month", "4th-last month or earlier"];
-  const timRows = DATA.refundTiming.map(r => `<tr><td class="rep">${BLAB[r.before]}</td><td>${fmt(r.closes)}</td><td>${r.refunds}</td><td>${pc(r.rate)}</td></tr>`).join("");
-  const tc = DATA.refundTiming.reduce((a, r) => a + r.closes, 0), tr = DATA.refundTiming.reduce((a, r) => a + r.refunds, 0);
-  const lens = DATA.refundMeta.lengths.split("; ").map(x => x.replace(":", " ") + " mo").join(", ");
-  const BWORD = ["last month", "1 month", "2 months", "3 months"];
-  const pplRows = DATA.refundPeople.map(r => `<tr><td class="rep">${r.cycle}</td><td>${r.n}</td><td>${dfmt(r.first_paid)}</td>
-    <td>${+r.before === 0 ? "Last month" : (+r.before >= 3 ? "3+ months" : BWORD[+r.before])}</td>
-    <td>${r.paid}${r.later ? `, ${esc(r.later)}` : ""}</td><td>${r.refunded_on ? dfmt(r.refunded_on) : "No date on sheet"}</td></tr>`).join("");
-  const R = DATA.refundPeople.length, sh = n => Math.round(n / R * 100);
-  const T = DATA.refundTiming, early = T.find(x => x.before === 3), last = T.find(x => x.before === 0);
-  const byC = ["C4", "C5", "C6", "C7", "C8"].map(c => `${c} ${DATA.refundPeople.filter(p => p.cycle === c).length}`).join(", ");
-  return `<section class="panel guide">
-    <h2>Key points on refunds</h2>
-    <ul>
-      <li>${R} refunds from C4 to C8 (${byC}). C9 has none so far.</li>
-      <li>Half the refunds (${split(null, "down")} of ${R}, ${sh(split(null, "down"))}%) paid only the down payment and asked for a refund before paying the balance. The other half had paid the full fee: ${split(null, "full")} paid in full upfront (${sh(split(null, "full"))}%) and ${split(null, "balance")} paid the balance first and were refunded after that (${sh(split(null, "balance"))}%).</li>
-      <li>People who pay early refund more. The refund rate is ${(early.rate * 100).toFixed(1)}% for those who paid 3 or more months before the cohort started, and ${(last.rate * 100).toFixed(1)}% for those who paid in the last month.</li>
-      <li>Refunds come at the end of the cycle, just before the cohort starts, when we push partial payers for the balance.</li>
-    </ul>
-  </section>
-  <section class="panel">
+
+  const toggle = `<div class="tabs" role="group" aria-label="Show refunds for">${["all", ...refCycles].map(c =>
+    `<button class="tab" data-org="${c}" aria-selected="${orgCycle === c}">${c === "all" ? "All cycles" : c}</button>`).join("")}</div>`;
+  const timRows = buckets.map(x => `<tr><td class="rep">${WHEN[x.b]}</td><td>${fmt(x.closes)}</td><td>${x.refunds}</td><td>${x.closes ? r1(x.refunds / x.closes) : "–"}</td></tr>`).join("");
+  const pplRows = pick.map(p => `<tr><td class="rep">${p.cycle}</td><td>${dfmt(p.first_paid)}</td><td>${WHEN[Math.min(3, +p.before)]}</td>
+    <td>${p.paid === "Full" ? "Full upfront" : p.later ? "Down payment + full balance" : "Down payment only"}</td>
+    <td>${p.refunded_on ? dfmt(p.refunded_on) : "No date"}</td></tr>`).join("");
+  const avg = pick.length ? (pick.reduce((a, p) => a + +p.before, 0) / pick.length + 1).toFixed(1) : null;
+
+  return keyBox + `<section class="panel">
     <h2>Cycle summary</h2>
     <div class="tbl-wrap"><table class="center">
       <thead><tr><th>Cycle</th><th>Lead source</th><th>Leads</th><th>Closes (after refunds)</th><th>Conversion</th><th>Refunds</th><th>Gross closes</th><th>Refund rate</th></tr></thead>
       <tbody>${sumRows}</tbody></table></div>
-    <p class="sub">Leads = unique people in that cycle's mastersheet. Conversion = closes ÷ leads. Refund rate = refunds ÷ gross closes. C4 to C8 were organic only; paid ads started in C9.</p>
+    <p class="sub">Leads = people in that cycle's mastersheet. Conversion = closes ÷ leads. Refund rate = refunds ÷ gross closes. C4 to C8 had no paid ads; ads started in C9.</p>
   </section>
   <section class="panel">
     <h2>Closes by month</h2>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Cycle</th>${Array.from({ length: maxNo }, (_, i) => `<th>Month ${i + 1}</th>`).join("")}<th>Total</th></tr></thead>
       <tbody>${monRows}</tbody></table></div>
-    <p class="sub">Closes added each month, one per person, dated by their first payment.</p>
+    <p class="sub">New closes each month, counted on the person's first payment.</p>
   </section>
   <section class="panel">
     <h2>Refunds</h2>
-    <div class="tbl-wrap"><table class="center">
-      <thead><tr><th>Cycle</th><th>Refunds</th><th>Down payment only</th><th>Down payment, then full balance</th><th>Paid in full upfront</th><th>Refund dates on the sheet</th><th>Time after payment</th><th>Note</th></tr></thead>
-      <tbody>${refRows}<tr><td class="rep">Total</td><td><b>${tot("refunds")}</b></td><td><b>${split(null, "down")}</b></td><td><b>${split(null, "balance")}</b></td><td><b>${split(null, "full")}</b></td><td></td><td></td><td></td></tr></tbody></table></div>
-    <p class="sub">Refunds come at the end of the cycle, just before the cohort starts, when we push partial payers to pay the balance. Where a date is on the sheet, the refund came 9 to 76 days after the person paid, and none came in the first month.</p>
-  </section>
-  <section class="panel">
-    <h2>Refunds by when they first paid</h2>
-    <p class="sub">Counted back from the end of each cycle (the month just before the cohort starts), so 4-month and 5-month cycles line up. Cycle lengths: ${lens}.</p>
     <div class="tbl-wrap"><table class="center narrow">
-      <thead><tr><th>First paid in</th><th>Closes</th><th>Refunds</th><th>Refund rate</th></tr></thead>
-      <tbody>${timRows}<tr><td class="rep">Total</td><td><b>${fmt(tc)}</b></td><td><b>${tr}</b></td><td><b>${pc(tr / tc)}</b></td></tr></tbody></table></div>
-    <p class="sub">On average, refunded people first paid ${(+DATA.refundMeta.avg_refund_before).toFixed(1)} months before the cycle ended, against ${(+DATA.refundMeta.avg_close_before).toFixed(1)} months for all closes. People who pay early in the cycle refund more; part of that is C6, where 7 of 10 refunds paid in its first month. C4 to C8.</p>
+      <thead><tr><th>Cycle</th><th>Refunds</th><th>Down payment only</th><th>Down payment + full balance</th><th>Full upfront</th><th>Note</th></tr></thead>
+      <tbody>${refRows}<tr><td class="rep">Total</td><td><b>${R}</b></td><td><b>${split(PEOPLE, "down")}</b></td><td><b>${split(PEOPLE, "balance")}</b></td><td><b>${split(PEOPLE, "full")}</b></td><td></td></tr></tbody></table></div>
+    <p class="sub">How much each person had paid before asking for a refund.</p>
   </section>
   <section class="panel">
-    <h2>Refunds by person</h2>
+    <div class="head-row"><h2>When refunded people paid</h2>${toggle}</div>
+    <div class="tbl-wrap"><table class="center narrow">
+      <thead><tr><th>When they first paid</th><th>Closes</th><th>Refunds</th><th>Refund rate</th></tr></thead>
+      <tbody>${timRows}<tr><td class="rep">Total</td><td><b>${fmt(tc)}</b></td><td><b>${tr}</b></td><td><b>${tc ? r1(tr / tc) : "–"}</b></td></tr></tbody></table></div>
+    <p class="sub">Months are counted back from when the cohort starts, so a 4-month and a 5-month cycle compare fairly.${avg ? ` Refunded people paid ${avg} months before start on average.` : ""}</p>
+    <h2 style="margin-top:18px">Each refund</h2>
     <div class="tbl-wrap"><table class="center">
-      <thead><tr><th>Cycle</th><th>#</th><th>First paid</th><th>Months before cycle end</th><th>Paid</th><th>Refunded on</th></tr></thead>
-      <tbody>${pplRows}</tbody></table></div>
+      <thead><tr><th>Cycle</th><th>First paid</th><th>When</th><th>What they had paid</th><th>Refunded on</th></tr></thead>
+      <tbody>${pplRows || `<tr><td colspan="5">No refunds</td></tr>`}</tbody></table></div>
   </section>`;
 }
 
@@ -402,6 +421,7 @@ function render() {
   const known = VIEWS.some(([v]) => v === id) ? id : "overall";
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.go === known));
   $("#view").innerHTML = known === "overall" ? viewOverall() : known === "org" ? orgLevel() : known === "reps" ? viewReps() : viewCycle(known);
+  document.querySelectorAll("[data-org]").forEach(b => b.addEventListener("click", () => { orgCycle = b.dataset.org; render(); }));
   document.querySelectorAll("[data-pick]").forEach(sel => sel.addEventListener("change", () => {
     if (!sel.value) return;
     pickedRep = sel.value; try { localStorage.setItem("rep-pick", pickedRep); } catch (e) {} render();
